@@ -4,3 +4,6 @@ Frontend/.env
 # Backend
 Backend/node_modules/
 Backend/.env
+
+# Warp AI configuration
+WARP.md
