@@ -1,4 +1,5 @@
 import express from 'express';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 
@@ -18,5 +19,8 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
 });
+
+// API routes
+app.use('/api/auth', authRoutes);
 
 export default app;
