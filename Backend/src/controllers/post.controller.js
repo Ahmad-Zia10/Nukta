@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { summarizeText } from '../utils/summarizer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -264,6 +265,49 @@ export const getMyPosts = async (req, res) => {
       success: false,
       message: 'Error fetching your posts',
       error: error.message,
+    });
+  }
+};
+
+/**
+ * Summarize a post using Hugging Face API
+ */
+export const summarizePost = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    // Find post
+    const post = await Post.findOne({ slug });
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found',
+      });
+    }
+
+    // Check if post has content
+    if (!post.content || post.content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Post content is empty',
+      });
+    }
+
+    // Generate summary
+    const summary = await summarizeText(post.content);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        summary,
+        postTitle: post.title,
+      },
+    });
+  } catch (error) {
+    console.error('Summarize post error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Error summarizing post',
     });
   }
 };

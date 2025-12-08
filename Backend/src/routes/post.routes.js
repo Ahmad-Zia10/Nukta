@@ -6,6 +6,7 @@ import {
   getPost,
   listPosts,
   getMyPosts,
+  summarizePost,
 } from '../controllers/post.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import upload from '../middlewares/upload.middleware.js';
@@ -15,6 +16,7 @@ const router = express.Router();
 // Public routes
 router.get('/', listPosts);
 router.get('/:slug', getPost);
+router.get('/:slug/summarize', summarizePost);
 
 // Protected routes
 router.post('/', authenticate, upload.single('featuredImage'), createPost);
