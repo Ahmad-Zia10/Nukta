@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {Button, Input, Logo} from './index'
 import { login as authLogin } from "../store/authSlice";
-import authService from '../appwrite/auth'
-import { useDispatch, useSelector } from "react-redux";
+import { authService } from '../services/api';
+import { useDispatch } from "react-redux";
 import {useForm} from 'react-hook-form';
 
 function Login() {
@@ -14,21 +14,15 @@ function Login() {
 
     const login = async (data) => {
        try {
-
-        const session = await  authService.logIn(data);
-        console.log("Seesssion created or not here it is", session);
-        if(session) {
-            const userData = await authService.getCurrentUser();
-            if(userData){
-                console.log("login userData is ",userData);
-                console.log("userData.$id is ",userData.$id);
-                dispatch(authLogin(userData));
-                navigate("/");
-            }
+        setError("");
+        
+        // Login returns { user, token }
+        const { user } = await authService.logIn(data);
+        
+        if(user) {
+            dispatch(authLogin(user));
+            navigate("/");
         }
-        
-
-        
        } catch (error) {
             setError(error.message);
        }
