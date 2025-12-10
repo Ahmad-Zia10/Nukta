@@ -3,19 +3,20 @@ import { useForm } from 'react-hook-form'
 import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {Button, Input, Select, RTE} from '../index'
-import authService from '../../appwrite/bucket'
-import configureService from '../../appwrite/configure'
+import { useCreatePostMutation, useUpdatePostMutation, getFileView } from '../../store/apiSlice'
 
 
 export default function PostForm({post}) {
 
     const navigate = useNavigate();
     const userData = useSelector((state) => state.auth.userData);
-    console.log("PostForm userData is ",userData)
+    const [createPost, { isLoading: isCreating }] = useCreatePostMutation();
+    const [updatePost, { isLoading: isUpdating }] = useUpdatePostMutation();
+    
     const {register, handleSubmit, watch, getValues, setValue, control} = useForm({
         defaultValues : {
             title : post?.title || '',
-            slug: post?.$id || "",
+            slug: post?.slug || "",
             content: post?.content || "",
             status: post?.status || "active",
 
@@ -24,36 +25,40 @@ export default function PostForm({post}) {
 
 
     const submit = async (data) => {
-        if(post) {
-            const file = data.image[0] ? await authService.uploadFile(data.image[0]) : null;
-            console.log(post);
-            if(file) {
-                await authService.deleteFile(post.featuredImage);
-            }
-            const dbPost = configureService.updatePost(post.$id ,{
-                ...data, featuredImage : file ? file.$id : undefined
-            })
-
-            if(dbPost) {
-                navigate(`/post/${dbPost.$id}`)
-            }
-        }
-        else {
-            const file = data.image[0] ? await authService.uploadFile(data.image[0]) : null;
-
-            if(file) {
-                console.log("Data from form is",data);
-                console.log("userData with id is", userData.$id)
+        try {
+            if(post) {
+                // Update existing post
+                const postData = {
+                    slug: post.slug,
+                    title: data.title,
+                    content: data.content,
+                    status: data.status,
+                };
                 
-                const fileId = file.$id;
-                data.featuredImage = fileId;
-                const dbPost = await configureService.createPost({
-                    ...data, userId : userData.$id
-                });//The user that is creating the post should be linked to the post that he is creating so that we can connect different users to their personalized posts
-                if(dbPost) {
-                    navigate(`/post/${dbPost.$id}`);
+                // Add image if provided
+                if(data.image?.[0]) {
+                    postData.featuredImage = data.image[0];
                 }
+
+                const updatedPost = await updatePost(postData).unwrap();
+                navigate(`/post/${updatedPost.slug}`);
             }
+            else {
+                // Create new post
+                const postData = {
+                    title: data.title,
+                    slug: data.slug,
+                    content: data.content,
+                    status: data.status,
+                    featuredImage: data.image?.[0] || null,
+                };
+
+                const createdPost = await createPost(postData).unwrap();
+                navigate(`/post/${createdPost.slug}`);
+            }
+        } catch (error) {
+            console.error('Post submission error:', error);
+            alert(error.message || 'Failed to save post');
         }
     }
 
@@ -105,10 +110,10 @@ export default function PostForm({post}) {
                     accept="image/png, image/jpg, image/jpeg, image/gif"
                     {...register("image", { required: !post })}
                 />
-                {post && (
+                {post && post.featuredImage && (
                     <div className="w-full mb-4">
                         <img
-                            src={authService.getFileView(post.featuredImage)}
+                            src={getFileView(post.featuredImage)}
                             alt={post.title}
                             className="rounded-lg"
                         />
@@ -120,8 +125,13 @@ export default function PostForm({post}) {
                     className="mb-4 "
                     {...register("status", { required: true })}
                 />
-                <Button type="submit" bgColor={post ? "bg-green-500" : undefined} className="w-full" >
-                    {post ? "Update" : "Submit"}
+                <Button 
+                    type="submit" 
+                    bgColor={post ? "bg-green-500" : undefined} 
+                    className="w-full"
+                    disabled={isCreating || isUpdating}
+                >
+                    {isCreating || isUpdating ? "Saving..." : post ? "Update" : "Submit"}
                 </Button>
             </div>
         </form>
