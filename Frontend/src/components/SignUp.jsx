@@ -2,7 +2,7 @@ import React, {useState} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {Button, Input, Logo} from './index'
 import { login  } from "../store/authSlice";
-import { authService } from '../services/api';
+import { useSignupMutation } from '../store/apiSlice';
 import { useDispatch } from "react-redux";
 import {useForm} from 'react-hook-form';
 
@@ -11,19 +11,20 @@ function SignUp() {
     const [error, setError] = useState("");
     const dispatch = useDispatch();
     const {register, handleSubmit} = useForm();
+    const [signupUser, { isLoading }] = useSignupMutation();
 
     const signup = async(data) => {
         setError("");
         try {
-            // createAccount returns { user, token }
-            const { user } = await authService.createAccount(data);
+            // Signup mutation returns { user, token }
+            const result = await signupUser(data).unwrap();
             
-            if(user) {
-                dispatch(login(user));
+            if(result?.user) {
+                dispatch(login(result.user));
                 navigate("/");
             }
         } catch (error) {
-            setError(error.message);
+            setError(error.message || 'Signup failed');
         }
     }
 

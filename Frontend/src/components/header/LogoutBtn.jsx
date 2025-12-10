@@ -1,6 +1,6 @@
 import React from 'react'
 import { useDispatch } from 'react-redux'
-import authService from '../../appwrite/auth'
+import { useLogoutMutation } from '../../store/apiSlice'
 import { logout } from '../../store/authSlice'
 import { useNavigate } from 'react-router';
 
@@ -8,17 +8,17 @@ function LogoutBtn() {
 
     const dispatch = useDispatch();
     const navigate  = useNavigate();
+    const [logoutUser] = useLogoutMutation();
     
 
-    const logoutHandler = () => {
-        authService.logout()
-        .then(() => {
+    const logoutHandler = async () => {
+        try {
+            await logoutUser().unwrap();
             dispatch(logout());
             navigate("/login");
-        })
-        .catch((error) => {
-            console.error(error);
-        })
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
     }
 
 

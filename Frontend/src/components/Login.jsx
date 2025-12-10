@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {Button, Input, Logo} from './index'
 import { login as authLogin } from "../store/authSlice";
-import { authService } from '../services/api';
+import { useLoginMutation } from '../store/apiSlice';
 import { useDispatch } from "react-redux";
 import {useForm} from 'react-hook-form';
 
@@ -11,20 +11,21 @@ function Login() {
     const dispatch = useDispatch();
     const navigate = useNavigate();
     const {register, handleSubmit} = useForm();
+    const [loginUser, { isLoading }] = useLoginMutation();
 
     const login = async (data) => {
        try {
         setError("");
         
-        // Login returns { user, token }
-        const { user } = await authService.logIn(data);
+        // Login mutation returns { user, token }
+        const result = await loginUser(data).unwrap();
         
-        if(user) {
-            dispatch(authLogin(user));
+        if(result?.user) {
+            dispatch(authLogin(result.user));
             navigate("/");
         }
        } catch (error) {
-            setError(error.message);
+            setError(error.message || 'Login failed');
        }
     }
     
