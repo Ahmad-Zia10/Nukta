@@ -1,22 +1,28 @@
-import React, { useEffect, useState } from 'react'
-import appwriteService from '../appwrite/configure'
+import React from 'react'
+import { useListPostsQuery } from '../store/apiSlice'
 import { PostCard , Container} from '../components'
 
 
 function AllPosts() {
+    const { data, isLoading, isError, error } = useListPostsQuery({ status: 'active' });
+    const posts = data?.posts || [];
 
-    const [posts, setPosts] = useState([]);
-    useEffect(() => {
-        appwriteService.listPosts([]).then((posts) => {
-            if(posts) {
-                setPosts(posts.documents);
-                console.log("Posts in AllPosts is:",posts);
-                
-            }
-        })
-        .catch((e) => (console.log(e.message))) ;
-    },[])
 
+  if (isLoading) {
+    return (
+      <div className='w-full py-8 text-center'>
+        <p>Loading posts...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className='w-full py-8 text-center'>
+        <p className='text-red-500'>Error loading posts: {error?.message}</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -24,8 +30,7 @@ function AllPosts() {
         <Container className={"flex"}>
         <div className='w-3/4 flex flex-col gap-8 mx-auto'>
         {posts.map((post) => (
-            <div key={post.$id} >
-                
+            <div key={post._id} >
                 <PostCard {...post}/>
             </div>
         ))}

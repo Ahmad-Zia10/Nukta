@@ -1,33 +1,44 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Container, PostForm } from '../components'
 import { useNavigate, useParams } from 'react-router-dom'
-import appwriteService from '../appwrite/configure';
+import { useGetPostQuery } from '../store/apiSlice';
 
 
 function EditPost() {
-    const [post, setPost] = useState(null);
     const navigate = useNavigate();
     const {slug} = useParams();
+    const { data: post, isLoading, isError } = useGetPostQuery(slug, {
+        skip: !slug,
+    });
 
-    useEffect(() => {
-        if(slug) {
-            appwriteService.getPost(slug).then((post) => (
-                setPost(post)
-            ))
-            .catch((e) => (console.log(e.message)))
-        }
-        else {
-            navigate('/');
-        }
-    },[slug, navigate])
+    if (!slug) {
+        navigate('/');
+        return null;
+    }
 
-  return post ? (
+    if (isLoading) {
+        return (
+            <div className='py-8 text-center'>
+                <p>Loading post...</p>
+            </div>
+        );
+    }
+
+    if (isError || !post) {
+        return (
+            <div className='py-8 text-center'>
+                <p className='text-red-500'>Error loading post</p>
+            </div>
+        );
+    }
+
+  return (
     <div className='py-8'>
         <Container>
-            <PostForm post ={post}/>
+            <PostForm post={post}/>
         </Container>
     </div>
-  ) : null;
+  );
 }
 
 export default EditPost

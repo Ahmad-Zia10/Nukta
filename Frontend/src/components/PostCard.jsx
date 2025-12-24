@@ -1,20 +1,20 @@
 import React from 'react'
-import appwriteService from '../appwrite/bucket'
+import { getFileView } from '../store/apiSlice'
 import { Link } from 'react-router-dom'
 
 function PostCard({
-   $id,
+   _id,
+   slug,
    title,
    featuredImage
 }) {
-    const review = appwriteService.getFileView(featuredImage);
-    console.log("Get File Preview:",review);
-    console.log("File review href ", review.href);
+    const imageUrl = getFileView(featuredImage);
+    
   return (
-    <Link to={`/post/${$id}`}>
+    <Link to={`/post/${slug}`}>
         <div className='w-full bg-gray-100 rounded-xl p-4 text-center'>
             <div className='w-full justify-center mb-4'>
-                <img src={review.href} alt={title}
+                <img src={imageUrl} alt={title}
                 className='rounded-xl' />
 
             </div>

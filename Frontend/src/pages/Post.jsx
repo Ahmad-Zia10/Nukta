@@ -1,78 +1,71 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import appwriteService from "../appwrite/configure";
-import bucketService from '../appwrite/bucket'
+import { useGetPostQuery, useDeletePostMutation, useLazySummarizePostQuery, getFileView } from "../store/apiSlice";
 import { Button, Container } from "../components";
 import parse from "html-react-parser";
 import { useSelector } from "react-redux";
-import { summarizePost as summarizePostAPI } from "../services/api";
 
 export default function Post() {
-    const [post, setPost] = useState(null);
-    const [summary, setSummary] = useState(null);
-    const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-    const [summaryError, setSummaryError] = useState(null);
     const { slug } = useParams();
     const navigate = useNavigate();
-
     const userData = useSelector((state) => state.auth.userData);
     
-    const isAuthor = post && userData ? post.userId === userData.$id : false;
-
-    useEffect(() => {
-        console.log("userData is ",userData);
-        console.log("userData.$id ",userData.$id);
-        
-        if (slug) {
-            appwriteService.getPost(slug).then((post) => {
-                if (post) {
-                    setPost(post);
-                }
-                else navigate("/");
-            });
-        } else navigate("/");
-        
-    }, [slug, navigate]);
+    const { data: post, isLoading, isError } = useGetPostQuery(slug, {
+        skip: !slug,
+    });
+    const [deletePostMutation] = useDeletePostMutation();
+    const [triggerSummarize, { data: summaryData, isLoading: isLoadingSummary, error: summaryError }] = useLazySummarizePostQuery();
+    
+    const isAuthor = post && userData ? post.userId?._id === userData._id : false;
     
 
-    const deletePost = () => {
-        appwriteService.deletePost(post.$id).then((status) => {
-            if (status) {
-                bucketService.deleteFile(post.featuredImage);
-                navigate("/");
-            }
-        });
-    };
-
-    const handleSummarize = async () => {
-        if (!slug) return;
-        
-        setIsLoadingSummary(true);
-        setSummaryError(null);
-        
+    const deletePost = async () => {
         try {
-            const response = await summarizePostAPI(slug);
-            setSummary(response.data.summary);
+            await deletePostMutation(post.slug).unwrap();
+            navigate("/");
         } catch (error) {
-            setSummaryError(error.message || 'Failed to generate summary');
-        } finally {
-            setIsLoadingSummary(false);
+            console.error('Delete error:', error);
+            alert('Failed to delete post');
         }
     };
 
-    return post ? (
+    const handleSummarize = () => {
+        if (slug) {
+            triggerSummarize(slug);
+        }
+    };
+
+    if (!slug) {
+        navigate("/");
+        return null;
+    }
+
+    if (isLoading) {
+        return (
+            <div className="py-8 text-center">
+                <p>Loading post...</p>
+            </div>
+        );
+    }
+
+    if (isError || !post) {
+        navigate("/");
+        return null;
+    }
+
+    return (
         <div className="py-8">
             <Container className={"text-center"}>
                 <div className="w-full flex justify-center mb-4 relative border rounded-xl p-2">
                     <img
-                        src={bucketService.getFileView(post.featuredImage)}
+                        src={getFileView(post.featuredImage)}
                         alt={post.title}
                         className="rounded-xl h-1/2"
                     />
 
                     {isAuthor && (
                         <div className="absolute right-6 top-6">
-                            <Link to={`/edit-post/${post.$id}`}>
+                            <Link to={`/edit-post/${post.slug}`}>
                                 <Button bgColor="bg-green-500" className="mr-3">
                                     Edit
                                 </Button>
@@ -100,17 +93,17 @@ export default function Post() {
                 </div>
 
                 {/* Summary Display */}
-                {summary && (
+                {summaryData?.summary && (
                     <div className="w-full mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
                         <h2 className="text-xl font-bold mb-3 text-blue-800">AI Summary</h2>
-                        <p className="text-gray-700 leading-relaxed">{summary}</p>
+                        <p className="text-gray-700 leading-relaxed">{summaryData.summary}</p>
                     </div>
                 )}
 
                 {/* Error Display */}
                 {summaryError && (
                     <div className="w-full mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-                        <p className="text-red-700">{summaryError}</p>
+                        <p className="text-red-700">{summaryError?.message || 'Failed to generate summary'}</p>
                     </div>
                 )}
                 
@@ -119,5 +112,5 @@ export default function Post() {
                 </div>
             </Container>
         </div>
-    ) : null;
+    );
 }

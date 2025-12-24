@@ -1,20 +1,14 @@
-import React, {useEffect, useState} from 'react'
-import appwriteService from "../appwrite/configure";
+import React from 'react'
+import { useListPostsQuery } from '../store/apiSlice';
 import {Container, PostCard} from '../components'
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 
 function Home() {
-    const [posts, setPosts] = useState([])
     const authStatus = useSelector((state) => (state.auth.status));
-    useEffect(() => {
-        appwriteService.listPosts().then((posts) => {
-            if (posts) {
-                setPosts(posts.documents)
-            }
-        })
-    }, [authStatus])
+    const { data, isLoading } = useListPostsQuery({ status: 'active' });
+    const posts = data?.posts || [];
   
     if (posts.length === 0 && !authStatus) {
         return (
@@ -55,8 +49,7 @@ function Home() {
             <Container>
                 <div className='flex flex-wrap'>
                     {posts.map((post) => (
-                        <div key={post.$id} className='p-2 w-1/4'>
-                            {console.log("Single Post is ",{...post})}
+                        <div key={post._id} className='p-2 w-1/4'>
                             <PostCard {...post} />
                         </div>
                     ))}
