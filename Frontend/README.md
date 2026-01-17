@@ -1,6 +1,31 @@
-# React + Vite
+# Nukta App - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React blog application built with Vite, Redux Toolkit, and TailwindCSS.
+
+## Development
+
+### Quick Start (Recommended)
+Run both frontend and backend servers concurrently:
+```bash
+npm start
+```
+
+### Individual Scripts
+- `npm run dev` - Run frontend only (port 5173)
+- `npm run server` - Run backend only (port 3000)
+- `npm run client` - Alias for `npm run dev`
+- `npm run build` - Build for production
+- `npm run lint` - Run ESLint
+
+## Tech Stack
+- React 19
+- Vite
+- Redux Toolkit (RTK Query)
+- React Router v7
+- TailwindCSS v4
+- TinyMCE Editor
+
+## Vite Plugins
 
 Currently, two official plugins are available:
 
