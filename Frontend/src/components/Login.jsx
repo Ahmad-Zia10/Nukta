@@ -17,15 +17,22 @@ function Login() {
        try {
         setError("");
         
+        console.log('Attempting login with:', data);
+        
         // Login mutation returns { user, token }
         const result = await loginUser(data).unwrap();
+        
+        console.log('Login result:', result);
         
         if(result?.user) {
             dispatch(authLogin(result.user));
             navigate("/");
         }
        } catch (error) {
-            setError(error.message || 'Login failed');
+            console.error('Login error:', error);
+            // RTK Query error format
+            const errorMessage = error?.data?.message || error?.message || 'Login failed';
+            setError(errorMessage);
        }
     }
     
@@ -75,7 +82,8 @@ function Login() {
                 <Button
                 type="submit"
                 className="w-full"
-                >Sign in</Button>
+                disabled={isLoading}
+                >{isLoading ? 'Signing in...' : 'Sign in'}</Button>
             </div>
         </form>
         </div>

@@ -16,15 +16,22 @@ function SignUp() {
     const signup = async(data) => {
         setError("");
         try {
+            console.log('Attempting signup with:', data);
+            
             // Signup mutation returns { user, token }
             const result = await signupUser(data).unwrap();
+            
+            console.log('Signup result:', result);
             
             if(result?.user) {
                 dispatch(login(result.user));
                 navigate("/");
             }
         } catch (error) {
-            setError(error.message || 'Signup failed');
+            console.error('Signup error:', error);
+            // RTK Query error format
+            const errorMessage = error?.data?.message || error?.message || 'Signup failed';
+            setError(errorMessage);
         }
     }
 
@@ -76,8 +83,12 @@ function SignUp() {
                         {...register("password", {
                             required: true,})}
                         />
-                        <Button type="submit" className="w-full">
-                            Create Account
+                        <Button 
+                            type="submit" 
+                            className="w-full"
+                            disabled={isLoading}
+                        >
+                            {isLoading ? 'Creating Account...' : 'Create Account'}
                         </Button>
                     </div>
                 </form>
