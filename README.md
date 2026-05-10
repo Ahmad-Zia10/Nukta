@@ -469,14 +469,6 @@ This project is licensed under the ISC License.
 
 ---
 
-## 📞 Support
-
-If you have any questions or need help, please:
-- Open an [issue](https://github.com/Ahmad-Zia10/Nukta/issues)
-- Contact via email: [your-email@example.com]
-
----
-
 <div align="center">
   <p>Made with ❤️ and ☕</p>
   <p>⭐ Star this repo if you find it helpful!</p>
