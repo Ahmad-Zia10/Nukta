@@ -2,14 +2,23 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:3000';
 
+// Endpoints that send a FormData body (file uploads). These must not have a
+// Content-Type header set manually — see prepareHeaders below.
+const FORM_DATA_ENDPOINTS = new Set(['createPost', 'updatePost']);
+
 // Create RTK Query API slice
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: fetchBaseQuery({
     baseUrl: API_BASE_URL,
     credentials: 'include', // Important: send cookies with requests
-    prepareHeaders: (headers) => {
-      headers.set('Content-Type', 'application/json');
+    prepareHeaders: (headers, { endpoint }) => {
+      // Do NOT set Content-Type for multipart uploads: the browser must set it
+      // itself so it can include the multipart boundary. Setting it here would
+      // override that and leave the server unable to parse the body.
+      if (!FORM_DATA_ENDPOINTS.has(endpoint)) {
+        headers.set('Content-Type', 'application/json');
+      }
       return headers;
     },
   }),
@@ -72,11 +81,6 @@ export const apiSlice = createApi({
           method: 'POST',
           body: formData,
           formData: true,
-          // Override headers for multipart/form-data
-          prepareHeaders: (headers) => {
-            headers.delete('Content-Type'); // Let browser set the correct boundary
-            return headers;
-          },
         };
       },
       transformResponse: (response) => response.data.post,
@@ -99,10 +103,6 @@ export const apiSlice = createApi({
           method: 'PUT',
           body: formData,
           formData: true,
-          prepareHeaders: (headers) => {
-            headers.delete('Content-Type');
-            return headers;
-          },
         };
       },
       transformResponse: (response) => response.data.post,
