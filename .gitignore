@@ -1,9 +1,40 @@
+# Dependencies
+node_modules/
 Frontend/node_modules/
-Frontend/.env
-
-# Backend
 Backend/node_modules/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+Frontend/.env
 Backend/.env
+
+# Build output
+dist/
+build/
+Frontend/dist/
+Frontend/build/
+
+# Uploaded user content (runtime artifacts, not source)
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Tooling
+.vercel
+coverage/
 
 # Warp AI configuration
 WARP.md
