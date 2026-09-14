@@ -1,0 +1,28 @@
+# Render blueprint for the Nukta API.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repo.
+# Secrets (sync: false) are entered in the Render UI, never committed.
+services:
+  - type: web
+    name: nukta-api
+    runtime: node
+    rootDir: Backend
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: 7d
+      # The Vercel frontend origin. Only used as a CORS fallback: with the
+      # same-origin proxy the browser never makes a cross-origin call.
+      - key: FRONTEND_URL
+        sync: false
+      - key: HUGGINGFACE_API_KEY
+        sync: false
