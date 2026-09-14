@@ -18,7 +18,7 @@ function SignUp() {
         try {
             console.log('Attempting signup with:', data);
             
-            // Signup mutation returns { user, token }
+            // Signup mutation returns { user }; the JWT arrives as an httpOnly cookie
             const result = await signupUser(data).unwrap();
             
             console.log('Signup result:', result);

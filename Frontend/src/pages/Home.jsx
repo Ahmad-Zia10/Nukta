@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux';
 
 function Home() {
     const authStatus = useSelector((state) => (state.auth.status));
-    const { data, isLoading } = useListPostsQuery({ status: 'active' });
+    const { data, isLoading } = useListPostsQuery();
     const posts = data?.posts || [];
   
     if (posts.length === 0 && !authStatus) {

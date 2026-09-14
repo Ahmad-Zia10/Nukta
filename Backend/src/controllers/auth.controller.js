@@ -54,9 +54,11 @@ export const signup = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'User registered successfully',
+      // The token is delivered only as an httpOnly cookie. Returning it here
+      // as well would expose it to any script on the page, which is exactly
+      // what httpOnly exists to prevent.
       data: {
         user: userResponse,
-        token,
       },
     });
   } catch (error) {
@@ -124,9 +126,11 @@ export const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Login successful',
+      // The token is delivered only as an httpOnly cookie. Returning it here
+      // as well would expose it to any script on the page, which is exactly
+      // what httpOnly exists to prevent.
       data: {
         user: userResponse,
-        token,
       },
     });
   } catch (error) {

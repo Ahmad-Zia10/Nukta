@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { summarizeText } from '../utils/summarizer.js';
+import { sanitizePostContent, stripTags } from '../utils/sanitize.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,13 +40,25 @@ export const createPost = async (req, res) => {
       featuredImage = `/uploads/${req.file.filename}`;
     }
 
+    // Sanitize author-supplied HTML before it is stored. TinyMCE filters on the
+    // client only, which a direct API call bypasses entirely.
+    const cleanContent = sanitizePostContent(content);
+    const cleanTitle = stripTags(title);
+
+    if (!cleanTitle || !cleanContent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Title and content must contain readable text',
+      });
+    }
+
     // Create post
     const post = await Post.create({
-      title,
+      title: cleanTitle,
       slug,
-      content,
+      content: cleanContent,
       featuredImage,
-      status: status || 'active',
+      status: status === 'inactive' ? 'inactive' : 'active',
       userId,
     });
 
@@ -102,10 +115,28 @@ export const updatePost = async (req, res) => {
       post.featuredImage = `/uploads/${req.file.filename}`;
     }
 
-    // Update fields
-    if (title) post.title = title;
-    if (content) post.content = content;
-    if (status) post.status = status;
+    // Update fields (sanitizing anything author-supplied, as on create)
+    if (title !== undefined) {
+      const cleanTitle = stripTags(title);
+      if (!cleanTitle) {
+        return res.status(400).json({
+          success: false,
+          message: 'Title must contain readable text',
+        });
+      }
+      post.title = cleanTitle;
+    }
+    if (content !== undefined) {
+      const cleanContent = sanitizePostContent(content);
+      if (!cleanContent) {
+        return res.status(400).json({
+          success: false,
+          message: 'Content must contain readable text',
+        });
+      }
+      post.content = cleanContent;
+    }
+    if (status === 'active' || status === 'inactive') post.status = status;
 
     await post.save();
 
@@ -190,6 +221,19 @@ export const getPost = async (req, res) => {
       });
     }
 
+    // Inactive posts are drafts: only their author may read them. Respond 404
+    // rather than 403 so the existence of a draft is not disclosed.
+    if (post.status !== 'active') {
+      const requesterId = req.user?._id?.toString();
+      const authorId = post.userId?._id ? post.userId._id.toString() : post.userId?.toString();
+      if (!requesterId || requesterId !== authorId) {
+        return res.status(404).json({
+          success: false,
+          message: 'Post not found',
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: { post },
@@ -209,13 +253,12 @@ export const getPost = async (req, res) => {
  */
 export const listPosts = async (req, res) => {
   try {
-    const { status, userId } = req.query;
+    const { userId } = req.query;
 
-    // Build query
-    const query = {};
-    if (status) {
-      query.status = status;
-    }
+    // The public listing only ever returns published posts. The client used to
+    // choose the status, which meant drafts were one query parameter away from
+    // being public. Authors read their own drafts via /api/posts/user/my-posts.
+    const query = { status: 'active' };
     if (userId) {
       query.userId = userId;
     }

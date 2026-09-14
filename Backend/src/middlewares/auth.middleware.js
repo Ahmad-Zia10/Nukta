@@ -40,3 +40,29 @@ export const authenticate = async (req, res, next) => {
     });
   }
 };
+
+/**
+ * Optional authentication.
+ *
+ * Attaches `req.user` when a valid token is present but, unlike `authenticate`,
+ * never rejects the request. Used on public routes whose *response* varies by
+ * viewer — e.g. a post author may read their own unpublished drafts while
+ * everyone else gets a 404.
+ */
+export const optionalAuthenticate = async (req, res, next) => {
+  try {
+    const token = req.cookies?.token || req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) return next();
+
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.userId).select('-password');
+
+    if (user) req.user = user;
+  } catch {
+    // An invalid or expired token is treated as "not signed in" here; the
+    // request continues as anonymous rather than failing.
+  }
+
+  return next();
+};

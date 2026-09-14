@@ -9,6 +9,7 @@ export default function Post() {
     const { slug } = useParams();
     const navigate = useNavigate();
     const userData = useSelector((state) => state.auth.userData);
+    const authStatus = useSelector((state) => state.auth.status);
     
     const { data: post, isLoading, isError } = useGetPostQuery(slug, {
         skip: !slug,
@@ -80,7 +81,8 @@ export default function Post() {
                     <h1 className="text-2xl font-bold">{post.title}</h1>
                 </div>
                 
-                {/* Summarize Button */}
+                {/* Summarize Button — the endpoint requires a signed-in user */}
+                {authStatus && (
                 <div className="w-full mb-6 flex justify-center">
                     <Button 
                         bgColor="bg-blue-500" 
@@ -91,6 +93,7 @@ export default function Post() {
                         {isLoadingSummary ? 'Generating Summary...' : 'Summarize Post'}
                     </Button>
                 </div>
+                )}
 
                 {/* Summary Display */}
                 {summaryData?.summary && (

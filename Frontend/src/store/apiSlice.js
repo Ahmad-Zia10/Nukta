@@ -127,12 +127,14 @@ export const apiSlice = createApi({
     }),
 
     listPosts: builder.query({
+      // The server always restricts this listing to published posts; a status
+      // param is no longer honoured. Authors read drafts via getMyPosts.
       query: (params = {}) => {
         const queryParams = new URLSearchParams();
-        if (params.status) queryParams.append('status', params.status);
         if (params.userId) queryParams.append('userId', params.userId);
-        
-        return `/api/posts?${queryParams.toString()}`;
+
+        const qs = queryParams.toString();
+        return qs ? `/api/posts?${qs}` : '/api/posts';
       },
       transformResponse: (response) => response.data,
       providesTags: (result) =>

@@ -7,11 +7,20 @@ import { dirname } from 'path';
 import authRoutes from './routes/auth.routes.js';
 import postRoutes from './routes/post.routes.js';
 import { errorHandler, notFound } from './middlewares/error.middleware.js';
+import { apiLimiter } from './middlewares/rateLimit.middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+
+// Behind a hosting proxy (Vercel, Render, Fly, …) the socket address is the
+// proxy's, so rate limiting would bucket every visitor together. Trust one hop
+// so express reads the client IP from X-Forwarded-For. Kept off in development
+// where there is no proxy and the header would be spoofable.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // CORS configuration
 const corsOptions = {
@@ -46,6 +55,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+app.use('/api', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
 

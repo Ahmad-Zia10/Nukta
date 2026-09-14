@@ -8,15 +8,18 @@ import {
   getMyPosts,
   summarizePost,
 } from '../controllers/post.controller.js';
-import { authenticate } from '../middlewares/auth.middleware.js';
+import { authenticate, optionalAuthenticate } from '../middlewares/auth.middleware.js';
+import { summarizeLimiter } from '../middlewares/rateLimit.middleware.js';
 import upload from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
 
 // Public routes
 router.get('/', listPosts);
-router.get('/:slug', getPost);
-router.get('/:slug/summarize', summarizePost);
+// Optional auth: an author may fetch their own draft; everyone else gets 404.
+router.get('/:slug', optionalAuthenticate, getPost);
+// Authenticated + rate limited: this proxies to a metered third-party API.
+router.get('/:slug/summarize', authenticate, summarizeLimiter, summarizePost);
 
 // Protected routes
 router.post('/', authenticate, upload.single('featuredImage'), createPost);

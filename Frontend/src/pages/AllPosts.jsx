@@ -4,7 +4,7 @@ import { PostCard , Container} from '../components'
 
 
 function AllPosts() {
-    const { data, isLoading, isError, error } = useListPostsQuery({ status: 'active' });
+    const { data, isLoading, isError, error } = useListPostsQuery();
     const posts = data?.posts || [];
 
 

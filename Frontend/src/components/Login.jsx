@@ -19,7 +19,7 @@ function Login() {
         
         console.log('Attempting login with:', data);
         
-        // Login mutation returns { user, token }
+        // Login mutation returns { user }; the JWT arrives as an httpOnly cookie
         const result = await loginUser(data).unwrap();
         
         console.log('Login result:', result);
