@@ -1,5 +1,14 @@
 import axios from 'axios';
 
+// The old serverless host (api-inference.huggingface.co) has been retired --
+// its DNS no longer resolves -- and was replaced by the Inference Providers
+// router. Overridable so the model can be swapped without a code change.
+const SUMMARIZATION_MODEL =
+  process.env.HUGGINGFACE_SUMMARIZATION_MODEL || 'facebook/bart-large-cnn';
+const SUMMARIZATION_ENDPOINT =
+  process.env.HUGGINGFACE_SUMMARIZATION_URL ||
+  `https://router.huggingface.co/hf-inference/models/${SUMMARIZATION_MODEL}`;
+
 /**
  * Summarize text using Hugging Face API
  * Uses the facebook/bart-large-cnn model for summarization
@@ -24,7 +33,7 @@ export const summarizeText = async (text) => {
       : cleanText;
 
     const response = await axios.post(
-      'https://api-inference.huggingface.co/models/facebook/bart-large-cnn',
+      SUMMARIZATION_ENDPOINT,
       {
         inputs: textToSummarize,
         parameters: {
@@ -58,6 +67,17 @@ export const summarizeText = async (text) => {
 
     if (error.response?.status === 401) {
       throw new Error('Invalid Hugging Face API key');
+    }
+
+    if (error.response?.status === 403) {
+      throw new Error(
+        'This Hugging Face token cannot call Inference Providers. Give the token ' +
+          'the "Make calls to Inference Providers" permission, or use a Read token.'
+      );
+    }
+
+    if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN') {
+      throw new Error('Could not reach the summarization service.');
     }
 
     throw new Error(error.message || 'Failed to summarize text');

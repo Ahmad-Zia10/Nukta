@@ -1,6 +1,11 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:3000';
+// Same-origin by default: the app calls /api/... and /uploads/... on its own
+// origin, and the host (Vercel rewrites in production, the Vite dev proxy
+// locally) forwards those to the backend. Keeping one origin is what lets the
+// auth cookie stay sameSite=strict. Set VITE_BACKEND_API_URL only to point at
+// a backend on a different origin, which then also needs CORS + sameSite=none.
+const API_BASE_URL = import.meta.env.VITE_BACKEND_API_URL || '';
 
 // Endpoints that send a FormData body (file uploads). These must not have a
 // Content-Type header set manually — see prepareHeaders below.
