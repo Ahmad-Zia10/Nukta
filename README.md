@@ -406,6 +406,57 @@ For complete API documentation, see [Backend README](Backend/readme.md).
 
 ---
 
+## 🔧 Troubleshooting
+
+### Port already in use
+
+```powershell
+# Windows PowerShell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess | Stop-Process
+Get-Process -Id (Get-NetTCPConnection -LocalPort 5173).OwningProcess | Stop-Process
+```
+
+### Generating a JWT secret
+
+Use a different random secret per environment:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+### MongoDB connection failures
+
+- Check `MONGODB_URI` in `Backend/.env`. It should **not** end with the database
+  name — `src/db/index.js` appends `/Nukta` itself.
+- Confirm your IP is allowed under MongoDB Atlas → Network Access.
+
+### Logged out after every refresh
+
+`VITE_BACKEND_API_URL` is set to a non-empty value. The app is served
+same-origin: `/api` is proxied to the backend (Vercel rewrites in production,
+the Vite dev proxy locally), which keeps the auth cookie first-party. Setting an
+absolute URL sends requests cross-origin, and the `sameSite=strict` cookie is
+then dropped. Leave the variable empty.
+
+### `/api/*` returns the HTML page instead of JSON
+
+The rewrite in `Frontend/vercel.json` is missing, still contains the
+`REPLACE-WITH-BACKEND-HOST` placeholder, or is ordered after the SPA catch-all.
+The `/api` rule must come first.
+
+### Image upload fails with "Image storage is not configured"
+
+Set `CLOUDINARY_URL` (or `CLOUDINARY_CLOUD_NAME` + `CLOUDINARY_CLOUD_API_KEY` +
+`CLOUDINARY_CLOUD_API_SECRET`) in `Backend/.env` and restart the server.
+
+### Summarization returns 403
+
+The Hugging Face token is missing the **Make calls to Inference Providers**
+permission. Edit it at <https://huggingface.co/settings/tokens>, or use a Read
+token.
+
+---
+
 ## 🧪 Testing
 
 ### Run Tests
