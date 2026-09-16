@@ -6,7 +6,17 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 export default [
   { ignores: ['dist'] },
   {
+    // Build/config files run in Node, not the browser, so they need Node globals
+    // (process, __dirname) rather than window/document.
+    files: ['*.config.js', 'vite.config.js', 'eslint.config.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
+    ignores: ['*.config.js'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,

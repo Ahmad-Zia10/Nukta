@@ -5,10 +5,6 @@
       "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
     },
     {
-      "source": "/uploads/:path*",
-      "destination": "https://REPLACE-WITH-BACKEND-HOST/uploads/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

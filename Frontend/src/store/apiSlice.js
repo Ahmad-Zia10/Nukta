@@ -196,5 +196,8 @@ export const {
 // Helper function to get file URL for viewing
 export const getFileView = (filePath) => {
   if (!filePath) return '';
+  // Images now live on Cloudinary, so stored values are already absolute URLs.
+  // Legacy posts still hold a server-relative `/uploads/...` path.
+  if (/^https?:\/\//i.test(filePath)) return filePath;
   return `${API_BASE_URL}${filePath}`;
 };

@@ -1,44 +1,33 @@
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { MAX_FILE_SIZE, ALLOWED_IMAGE_TYPES } from '../constants.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/**
+ * Multer configuration for post images.
+ *
+ * Files are held in memory and streamed to Cloudinary by the controller rather
+ * than written to disk. Hosting platforms give the app an ephemeral filesystem,
+ * so anything written locally disappears on the next deploy or cold start.
+ * Keeping the bytes in memory also means a request that fails validation never
+ * leaves an orphaned file behind.
+ */
 
-// Configure storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Store uploads in Backend/uploads directory
-    cb(null, path.join(__dirname, '../../uploads'));
-  },
-  filename: (req, file, cb) => {
-    // Generate unique filename: timestamp-randomstring-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    const basename = path.basename(file.originalname, ext);
-    cb(null, `${basename}-${uniqueSuffix}${ext}`);
-  }
-});
+const storage = multer.memoryStorage();
 
-// File filter - only allow images
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-  
-  if (allowedTypes.includes(file.mimetype)) {
+  if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'), false);
   }
 };
 
-// Multer configuration
 const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+  storage,
+  fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
-  }
+    fileSize: MAX_FILE_SIZE,
+    files: 1,
+  },
 });
 
 export default upload;

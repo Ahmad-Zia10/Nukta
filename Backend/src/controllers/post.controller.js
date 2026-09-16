@@ -1,13 +1,14 @@
 import Post from '../models/post.model.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { summarizeText } from '../utils/summarizer.js';
 import { sanitizePostContent, stripTags } from '../utils/sanitize.js';
+import { uploadImageBuffer, deleteImage, publicIdFromUrl } from '../utils/cloudinary.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+/**
+ * Distinguishes "the image could not be stored" from any other failure, so the
+ * caller gets an actionable message rather than a generic 500.
+ */
+const isImageStorageError = (error) =>
+  /not configured|CLOUDINARY|Image upload failed/i.test(error?.message || '');
 
 /**
  * Create a new post
@@ -34,10 +35,14 @@ export const createPost = async (req, res) => {
       });
     }
 
-    // Handle featured image if uploaded
+    // Upload the featured image before creating the post, so a failed upload
+    // never leaves a post pointing at an image that does not exist.
     let featuredImage = '';
+    let featuredImagePublicId = '';
     if (req.file) {
-      featuredImage = `/uploads/${req.file.filename}`;
+      const uploaded = await uploadImageBuffer(req.file.buffer);
+      featuredImage = uploaded.url;
+      featuredImagePublicId = uploaded.publicId;
     }
 
     // Sanitize author-supplied HTML before it is stored. TinyMCE filters on the
@@ -58,6 +63,7 @@ export const createPost = async (req, res) => {
       slug,
       content: cleanContent,
       featuredImage,
+      featuredImagePublicId,
       status: status === 'inactive' ? 'inactive' : 'active',
       userId,
     });
@@ -69,6 +75,14 @@ export const createPost = async (req, res) => {
     });
   } catch (error) {
     console.error('Create post error:', error);
+    // An image that could not be stored is a configuration/upstream problem,
+    // not a generic failure: say which, so it is actionable.
+    if (isImageStorageError(error)) {
+      return res.status(502).json({
+        success: false,
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       success: false,
       message: 'Error creating post',
@@ -103,16 +117,16 @@ export const updatePost = async (req, res) => {
       });
     }
 
-    // Handle new featured image if uploaded
+    // Upload the replacement first and remember the old asset: the previous
+    // image is only removed after the post has been saved successfully, so a
+    // failed save can never leave the post pointing at a deleted image.
+    let replacedImagePublicId = null;
     if (req.file) {
-      // Delete old image if exists
-      if (post.featuredImage) {
-        const oldImagePath = path.join(__dirname, '../../', post.featuredImage);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
-      }
-      post.featuredImage = `/uploads/${req.file.filename}`;
+      const uploaded = await uploadImageBuffer(req.file.buffer);
+      replacedImagePublicId =
+        post.featuredImagePublicId || publicIdFromUrl(post.featuredImage);
+      post.featuredImage = uploaded.url;
+      post.featuredImagePublicId = uploaded.publicId;
     }
 
     // Update fields (sanitizing anything author-supplied, as on create)
@@ -140,6 +154,11 @@ export const updatePost = async (req, res) => {
 
     await post.save();
 
+    // Best-effort cleanup; a failure here must not fail the update.
+    if (replacedImagePublicId) {
+      await deleteImage(replacedImagePublicId);
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Post updated successfully',
@@ -147,6 +166,12 @@ export const updatePost = async (req, res) => {
     });
   } catch (error) {
     console.error('Update post error:', error);
+    if (isImageStorageError(error)) {
+      return res.status(502).json({
+        success: false,
+        message: error.message,
+      });
+    }
     return res.status(500).json({
       success: false,
       message: 'Error updating post',
@@ -180,16 +205,14 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    // Delete featured image if exists
-    if (post.featuredImage) {
-      const imagePath = path.join(__dirname, '../../', post.featuredImage);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
-    }
+    // Delete the post first: an orphaned image is a far smaller problem than a
+    // post whose image has been removed while the post itself survived.
+    await Post.deleteOne({ _id: post._id });
 
-    // Delete post
-    await Post.deleteOne({ slug });
+    const publicId = post.featuredImagePublicId || publicIdFromUrl(post.featuredImage);
+    if (publicId) {
+      await deleteImage(publicId);
+    }
 
     return res.status(200).json({
       success: true,

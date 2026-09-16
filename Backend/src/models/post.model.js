@@ -22,6 +22,12 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Cloudinary public id for `featuredImage`, kept so the remote asset can be
+    // deleted without having to parse it back out of the delivery URL.
+    featuredImagePublicId: {
+      type: String,
+      default: '',
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
