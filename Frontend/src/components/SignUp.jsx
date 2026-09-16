@@ -10,28 +10,23 @@ function SignUp() {
     const navigate = useNavigate();
     const [error, setError] = useState("");
     const dispatch = useDispatch();
-    const {register, handleSubmit} = useForm();
+    const {register, handleSubmit, formState: {errors}} = useForm();
     const [signupUser, { isLoading }] = useSignupMutation();
 
     const signup = async(data) => {
         setError("");
         try {
-            console.log('Attempting signup with:', data);
-            
             // Signup mutation returns { user }; the JWT arrives as an httpOnly cookie
             const result = await signupUser(data).unwrap();
-            
-            console.log('Signup result:', result);
-            
+
             if(result?.user) {
                 dispatch(login(result.user));
                 navigate("/");
             }
-        } catch (error) {
-            console.error('Signup error:', error);
-            // RTK Query error format
-            const errorMessage = error?.data?.message || error?.message || 'Signup failed';
-            setError(errorMessage);
+        } catch (err) {
+            // RTK Query surfaces the server payload on `data`; `error` holds
+            // transport-level failures (network down, CORS).
+            setError(err?.data?.message || err?.error || err?.message || 'Signup failed');
         }
     }
 
@@ -60,16 +55,18 @@ function SignUp() {
                         <Input
                         label="Full Name: "
                         placeholder="Enter your full name"
+                        error={errors.name?.message}
                         {...register("name", {
-                            required: true,
+                            required: "Full name is required",
                         })}
                         />
                         <Input
                         label="Email: "
                         placeholder="Enter your email"
                         type="email"
+                        error={errors.email?.message}
                         {...register("email", {
-                            required: true,
+                            required: "Email is required",
                             validate: {
                                 matchPatern: (value) => /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(value) ||
                                 "Email address must be a valid address",
@@ -80,8 +77,14 @@ function SignUp() {
                         label="Password: "
                         type="password"
                         placeholder="Enter your password"
+                        error={errors.password?.message}
                         {...register("password", {
-                            required: true,})}
+                            required: "Password is required",
+                            minLength: {
+                                value: 6,
+                                message: "Password must be at least 6 characters",
+                            },
+                        })}
                         />
                         <Button 
                             type="submit" 

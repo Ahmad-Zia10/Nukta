@@ -19,7 +19,9 @@ function AllPosts() {
   if (isError) {
     return (
       <div className='w-full py-8 text-center'>
-        <p className='text-red-500'>Error loading posts: {error?.message}</p>
+        <p className='text-red-500'>
+          Error loading posts: {error?.data?.message || error?.error || 'Something went wrong'}
+        </p>
       </div>
     );
   }

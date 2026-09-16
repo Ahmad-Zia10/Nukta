@@ -9,7 +9,19 @@ function Home() {
     const authStatus = useSelector((state) => (state.auth.status));
     const { data, isLoading } = useListPostsQuery();
     const posts = data?.posts || [];
-  
+
+    // Without this, the initial render (posts still empty, request in flight)
+    // shows the "Login to read posts" prompt to every visitor for a moment.
+    if (isLoading) {
+        return (
+            <div className="w-full py-8 mt-4 text-center">
+                <Container>
+                    <p className="text-xl">Loading posts...</p>
+                </Container>
+            </div>
+        );
+    }
+
     if (posts.length === 0 && !authStatus) {
         return (
             <div className="w-full py-8 mt-4 text-center">

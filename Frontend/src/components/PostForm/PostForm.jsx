@@ -1,6 +1,5 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useSelector } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import {Button, Input, Select, RTE} from '../index'
 import { useCreatePostMutation, useUpdatePostMutation, getFileView } from '../../store/apiSlice'
@@ -9,11 +8,11 @@ import { useCreatePostMutation, useUpdatePostMutation, getFileView } from '../..
 export default function PostForm({post}) {
 
     const navigate = useNavigate();
-    const userData = useSelector((state) => state.auth.userData);
     const [createPost, { isLoading: isCreating }] = useCreatePostMutation();
     const [updatePost, { isLoading: isUpdating }] = useUpdatePostMutation();
     
-    const {register, handleSubmit, watch, getValues, setValue, control} = useForm({
+    const [error, setError] = useState("");
+    const {register, handleSubmit, watch, getValues, setValue, control, formState: {errors}} = useForm({
         defaultValues : {
             title : post?.title || '',
             slug: post?.slug || "",
@@ -25,6 +24,7 @@ export default function PostForm({post}) {
 
 
     const submit = async (data) => {
+        setError("");
         try {
             if(post) {
                 // Update existing post
@@ -56,9 +56,10 @@ export default function PostForm({post}) {
                 const createdPost = await createPost(postData).unwrap();
                 navigate(`/post/${createdPost.slug}`);
             }
-        } catch (error) {
-            console.error('Post submission error:', error);
-            alert(error.message || 'Failed to save post');
+        } catch (err) {
+            // RTK Query puts the server payload on `data`; `error` carries
+            // transport failures. `message` alone renders as undefined.
+            setError(err?.data?.message || err?.error || err?.message || 'Failed to save post');
         }
     }
 
@@ -70,36 +71,59 @@ export default function PostForm({post}) {
 
     },[]);
 
+    // Auto-fill the slug from the title, but only when creating. On an existing
+    // post the slug is its identity and the API ignores changes to it, so
+    // rewriting the field would show the author a slug that is never saved.
     useEffect(() => {
-        const subscription = watch((value, {name}) => {
-            if(name === "title") {
-                setValue("slug", slugTransformation(value.title), { shouldValidate: true })
+        if (post) return undefined;
+
+        const subscription = watch((value, { name }) => {
+            if (name === "title") {
+                setValue("slug", slugTransformation(value.title), { shouldValidate: true });
             }
-        })
+        });
         return () => subscription.unsubscribe();
-    },[])
+    }, [post, watch, setValue, slugTransformation])
 
 
 
 
     return (
         <form onSubmit={handleSubmit(submit)} className="flex flex-wrap">
+            {error && (
+                <div className="w-full px-2 mb-4">
+                    <p className="rounded-lg bg-red-50 border border-red-200 p-3 text-red-700">
+                        {error}
+                    </p>
+                </div>
+            )}
             <div className="w-2/3 px-2">
                 <Input
                     label="Title :"
                     placeholder="Title"
                     className="mb-4"
-                    {...register("title", { required: true })}
+                    error={errors.title?.message}
+                    {...register("title", { required: "Title is required" })}
                 />
                 <Input
                     label="Slug :"
                     placeholder="Slug"
-                    className="mb-4"
-                    {...register("slug", { required: true })}
+                    className="mb-4 disabled:bg-gray-100 disabled:text-gray-500"
+                    error={errors.slug?.message}
+                    // A post's slug is its identity and the API ignores changes
+                    // to it, so it is fixed once the post exists.
+                    disabled={Boolean(post)}
+                    {...register("slug", { required: "Slug is required" })}
                     onInput={(e) => {
+                        if (post) return;
                         setValue("slug", slugTransformation(e.currentTarget.value), { shouldValidate: true });
                     }}
                 />
+                {post && (
+                    <p className="-mt-2 mb-4 pl-1 text-sm text-gray-600">
+                        The slug cannot be changed after a post is created.
+                    </p>
+                )}
                 <RTE label="Content :" name="content" control={control} defaultValue={getValues("content")} />
             </div>
             <div className="w-1/3 px-2">
@@ -108,7 +132,10 @@ export default function PostForm({post}) {
                     type="file"
                     className="mb-4 "
                     accept="image/png, image/jpg, image/jpeg, image/gif"
-                    {...register("image", { required: !post })}
+                    error={errors.image?.message}
+                    {...register("image", {
+                        required: post ? false : "A featured image is required",
+                    })}
                 />
                 {post && post.featuredImage && (
                     <div className="w-full mb-4">
@@ -123,7 +150,8 @@ export default function PostForm({post}) {
                     options={["active", "inactive"]}
                     label="Status"
                     className="mb-4 "
-                    {...register("status", { required: true })}
+                    error={errors.status?.message}
+                    {...register("status", { required: "Status is required" })}
                 />
                 <Button 
                     type="submit" 

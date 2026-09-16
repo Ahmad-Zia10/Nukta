@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import {useDispatch} from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { useLazyGetCurrentUserQuery } from "./store/apiSlice";
 import { login, logout } from "./store/authSlice";
 import Header from "./components/header/Header"
@@ -7,12 +7,15 @@ import Footer from "./components/Footer/Footer"
 import { Outlet } from "react-router";
 
 function App() {
-  // As soon as the site loads, we have to check whether the user is logged in or not
-
   const dispatch = useDispatch();
-  const [getCurrentUser, { isLoading }] = useLazyGetCurrentUserQuery();
+  const [getCurrentUser] = useLazyGetCurrentUserQuery();
+  // Render nothing meaningful until the session check has finished. Route
+  // guards read the same flag, so they never redirect on a not-yet-known state.
+  const authChecked = useSelector((state) => state.auth.checked);
 
   useEffect(() => {
+    // A 401 is the normal "not signed in" response and rejects the promise,
+    // so both outcomes have to be handled.
     getCurrentUser()
       .unwrap()
       .then((userData) => {
@@ -22,35 +25,32 @@ function App() {
           dispatch(logout());
         }
       })
-      .catch((error) => {
-        console.log('Not authenticated:', error);
+      .catch(() => {
         dispatch(logout());
       });
-  }, []);
+  }, [getCurrentUser, dispatch]);
 
-  return !isLoading ? (
-    <>
-    <div className="min-h-screen flex flex-wrap 
-    content-between bg-gray-400">
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-400">
+        <div className="text-center">
+          <p className="text-xl">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-wrap content-between bg-gray-400">
       <div className="w-full block">
-      <Header/>
-      <main>
-       <Outlet />
-      </main>
-      <Footer/>
-    </div>
-    </div>
-    </>
-  )
-   : 
-   (
-    <div className="min-h-screen flex items-center justify-center bg-gray-400">
-      <div className="text-center">
-        <p className="text-xl">Loading...</p>
+        <Header />
+        <main>
+          <Outlet />
+        </main>
+        <Footer />
       </div>
     </div>
-   )
- 
+  );
 }
 
 export default App

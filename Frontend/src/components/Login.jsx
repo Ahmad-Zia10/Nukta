@@ -10,29 +10,24 @@ function Login() {
     const [error, setError] = useState("");
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const {register, handleSubmit} = useForm();
+    const {register, handleSubmit, formState: {errors}} = useForm();
     const [loginUser, { isLoading }] = useLoginMutation();
 
     const login = async (data) => {
        try {
         setError("");
-        
-        console.log('Attempting login with:', data);
-        
+
         // Login mutation returns { user }; the JWT arrives as an httpOnly cookie
         const result = await loginUser(data).unwrap();
-        
-        console.log('Login result:', result);
-        
+
         if(result?.user) {
             dispatch(authLogin(result.user));
             navigate("/");
         }
-       } catch (error) {
-            console.error('Login error:', error);
-            // RTK Query error format
-            const errorMessage = error?.data?.message || error?.message || 'Login failed';
-            setError(errorMessage);
+       } catch (err) {
+            // RTK Query surfaces the server payload on `data`; `error` holds
+            // transport-level failures (network down, CORS).
+            setError(err?.data?.message || err?.error || err?.message || 'Login failed');
        }
     }
     
@@ -63,8 +58,9 @@ function Login() {
                 label="email"
                 placeholder = "Enter Your Email"
                 type = "email"
+                error={errors.email?.message}
                 {...register("email",{
-                    required : true,
+                    required : "Email is required",
                     validate : {
                         matchPatern: (value) => /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(value) ||
                         "Email address must be a valid address",
@@ -75,8 +71,9 @@ function Login() {
                 label="Password: "
                 type="password"
                 placeholder="Enter your password"
+                error={errors.password?.message}
                 {...register("password", {
-                    required: true,
+                    required: "Password is required",
                 })}
                 />
                 <Button

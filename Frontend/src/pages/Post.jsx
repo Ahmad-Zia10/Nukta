@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useGetPostQuery, useDeletePostMutation, useLazySummarizePostQuery, getFileView } from "../store/apiSlice";
 import { Button, Container } from "../components";
@@ -8,6 +8,7 @@ import { useSelector } from "react-redux";
 export default function Post() {
     const { slug } = useParams();
     const navigate = useNavigate();
+    const [deleteError, setDeleteError] = useState("");
     const userData = useSelector((state) => state.auth.userData);
     const authStatus = useSelector((state) => state.auth.status);
     
@@ -20,13 +21,24 @@ export default function Post() {
     const isAuthor = post && userData ? post.userId?._id === userData._id : false;
     
 
+    // Redirecting during render is a side effect in the render path; React 19
+    // warns about it and it can fire mid-commit. Do it in an effect instead.
+    useEffect(() => {
+        if (!slug) navigate("/", { replace: true });
+    }, [slug, navigate]);
+
+    useEffect(() => {
+        if (!isLoading && (isError || !post)) navigate("/", { replace: true });
+    }, [isLoading, isError, post, navigate]);
+
     const deletePost = async () => {
         try {
             await deletePostMutation(post.slug).unwrap();
-            navigate("/");
-        } catch (error) {
-            console.error('Delete error:', error);
-            alert('Failed to delete post');
+            navigate("/", { replace: true });
+        } catch (err) {
+            setDeleteError(
+                err?.data?.message || err?.error || err?.message || 'Failed to delete post'
+            );
         }
     };
 
@@ -36,11 +48,6 @@ export default function Post() {
         }
     };
 
-    if (!slug) {
-        navigate("/");
-        return null;
-    }
-
     if (isLoading) {
         return (
             <div className="py-8 text-center">
@@ -49,10 +56,8 @@ export default function Post() {
         );
     }
 
-    if (isError || !post) {
-        navigate("/");
-        return null;
-    }
+    // The effect above handles the redirect; render nothing while it happens.
+    if (isError || !post) return null;
 
     return (
         <div className="py-8">
@@ -103,10 +108,18 @@ export default function Post() {
                     </div>
                 )}
 
+                {deleteError && (
+                    <div className="w-full mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+                        <p className="text-red-700">{deleteError}</p>
+                    </div>
+                )}
+
                 {/* Error Display */}
                 {summaryError && (
                     <div className="w-full mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
-                        <p className="text-red-700">{summaryError?.message || 'Failed to generate summary'}</p>
+                        <p className="text-red-700">
+                            {summaryError?.data?.message || summaryError?.error || 'Failed to generate summary'}
+                        </p>
                     </div>
                 )}
                 

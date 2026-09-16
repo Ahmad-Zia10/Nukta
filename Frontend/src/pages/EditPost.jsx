@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Container, PostForm } from '../components'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useGetPostQuery } from '../store/apiSlice';
@@ -11,10 +11,9 @@ function EditPost() {
         skip: !slug,
     });
 
-    if (!slug) {
-        navigate('/');
-        return null;
-    }
+    useEffect(() => {
+        if (!slug) navigate('/', { replace: true });
+    }, [slug, navigate]);
 
     if (isLoading) {
         return (
