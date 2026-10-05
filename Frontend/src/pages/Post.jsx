@@ -63,11 +63,13 @@ export default function Post() {
         <div className="py-8">
             <Container className={"text-center"}>
                 <div className="w-full flex justify-center mb-4 relative border rounded-xl p-2">
-                    <img
-                        src={getFileView(post.featuredImage)}
-                        alt={post.title}
-                        className="rounded-xl h-1/2"
-                    />
+                    {post.featuredImage && (
+                        <img
+                            src={getFileView(post.featuredImage)}
+                            alt={post.title}
+                            className="rounded-xl max-h-[28rem] w-full object-cover"
+                        />
+                    )}
 
                     {isAuthor && (
                         <div className="absolute right-6 top-6">
@@ -123,7 +125,7 @@ export default function Post() {
                     </div>
                 )}
                 
-                <div className="border-2 border-[#eee] rounded-[10px] bg-[#eee] text-[#222f3e] text-start px-5">
+                <div className="border-2 border-[#eee] rounded-[10px] bg-[#eee] text-[#222f3e] text-start px-5 overflow-x-auto break-words">
                     {parse(post.content)}
                 </div>
             </Container>

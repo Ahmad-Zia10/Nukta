@@ -1,14 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useListPostsQuery } from '../store/apiSlice';
-import {Container, PostCard} from '../components'
+import {Container, PostCard, Pagination} from '../components'
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
 
 function Home() {
     const authStatus = useSelector((state) => (state.auth.status));
-    const { data, isLoading } = useListPostsQuery();
+    const [page, setPage] = useState(1);
+    const { data, isLoading, isFetching } = useListPostsQuery({ page });
     const posts = data?.posts || [];
+    const totalPages = data?.totalPages || 1;
 
     // Without this, the initial render (posts still empty, request in flight)
     // shows the "Login to read posts" prompt to every visitor for a moment.
@@ -59,13 +61,19 @@ function Home() {
     return (
         <div className='w-full py-8'>
             <Container>
-                <div className='flex flex-wrap'>
+                <div className={`flex flex-wrap ${isFetching ? 'opacity-60' : ''}`}>
                     {posts.map((post) => (
-                        <div key={post._id} className='p-2 w-1/4'>
+                        <div key={post._id} className='p-2 w-full sm:w-1/2 lg:w-1/4'>
                             <PostCard {...post} />
                         </div>
                     ))}
                 </div>
+                <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    className='mt-8'
+                />
             </Container>
         </div>
     )

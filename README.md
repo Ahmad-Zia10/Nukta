@@ -38,22 +38,30 @@
 ## ✨ Features
 
 ### User Features
-- 📝 **Rich Text Editor** - Create beautiful blog posts with TinyMCE
-- 🖼️ **Image Uploads** - Featured images with automatic optimization
-- 👤 **User Authentication** - Secure signup, login, and session management
-- 📊 **Personal Dashboard** - Manage all your posts in one place
-- 🔍 **Post Discovery** - Browse and search through published posts
-- ⚡ **Real-time Updates** - Instant content updates across the platform
+- 📝 **Rich Text Editor** - Write posts with TinyMCE
+- 🖼️ **Image Uploads** - Featured images stored on Cloudinary and served from its CDN
+- 👤 **User Authentication** - Signup, login and sessions via httpOnly cookies
+- 📊 **My Posts** - Your own posts in one place, drafts included
+- 📄 **Drafts** - Save a post as inactive; only its author can see it
+- 🤖 **AI Summaries** - Generate a summary of any post (cached after the first run)
+- 📑 **Pagination** - Paged listings on the home page and your dashboard
 
 ### Technical Features
-- 🔐 **JWT Authentication** - Secure, stateless authentication
-- 🗄️ **MongoDB Database** - Scalable NoSQL database with Mongoose ODM
-- 📦 **File Storage** - Local file system with Multer middleware
-- 🚀 **RESTful API** - Clean, well-documented API endpoints
-- 🛡️ **Input Validation** - Comprehensive validation and sanitization
-- ⚠️ **Error Handling** - Centralized error handling with detailed responses
-- 🌐 **CORS Support** - Configurable cross-origin resource sharing
-- 🔄 **State Management** - Redux Toolkit for client-side state
+- 🔐 **JWT Authentication** - Signed tokens delivered only as httpOnly cookies
+- 🗄️ **MongoDB Database** - Mongoose ODM
+- ☁️ **Cloud File Storage** - Cloudinary, so images survive redeploys
+- 🚀 **RESTful API** - Consistent `{ success, message, data }` envelope
+- 🧼 **HTML Sanitization** - Post bodies are sanitized server-side before storage
+- 🚦 **Rate Limiting** - On auth endpoints, the summarizer, and the API overall
+- ⚠️ **Error Handling** - Centralized error middleware
+- 🔄 **State Management** - Redux Toolkit with RTK Query
+
+### Not implemented yet
+- Full-text search
+- Comments
+- Tags or categories
+- Password reset / email verification
+- Server-side rendering (so per-post link previews and SEO are limited)
 
 ---
 
@@ -204,7 +212,6 @@ Nukta/
 │   │   ├── app.js           # Express app setup
 │   │   ├── constants.js     # App constants
 │   │   └── index.js         # Entry point
-│   ├── uploads/             # Uploaded files
 │   ├── .env                 # Environment variables
 │   ├── .env.example         # Environment template
 │   ├── package.json
@@ -342,14 +349,23 @@ For complete API documentation, see [Backend README](Backend/readme.md).
 
 ### Implemented Security Features
 
-- ✅ **Password Hashing** - bcryptjs with salt rounds
-- ✅ **JWT Authentication** - Secure token-based auth
-- ✅ **HTTP-only Cookies** - Prevents XSS attacks
-- ✅ **CORS Configuration** - Whitelist allowed origins
-- ✅ **Input Validation** - Mongoose schema validation
-- ✅ **File Type Validation** - Only allowed image formats
-- ✅ **File Size Limits** - Max 5MB per upload
-- ✅ **SQL Injection Protection** - MongoDB query sanitization
+- ✅ **Password Hashing** - bcryptjs, hashed in a Mongoose pre-save hook
+- ✅ **JWT Authentication** - Token issued only as an httpOnly cookie, never in the response body
+- ✅ **Same-origin Cookies** - `sameSite=strict`; the API is proxied under the app's own origin
+- ✅ **Stored XSS Protection** - Post HTML sanitized with an allowlist before it is stored
+- ✅ **Draft Privacy** - Unpublished posts 404 for everyone except their author
+- ✅ **Rate Limiting** - Failed logins throttled; summarizer and API capped
+- ✅ **File Type Validation** - Declared MIME type *and* magic-number byte check
+- ✅ **File Size Limits** - Max 10MB per upload
+- ✅ **Ownership Checks** - Only a post's author may edit or delete it
+
+### Known gaps
+
+- No CSRF token. Protection currently relies on `sameSite=strict` and the
+  same-origin setup; a cross-origin deployment would need one.
+- Logout is client-side only. A stolen token stays valid until it expires,
+  since there is no server-side revocation list.
+- No email verification, so addresses are unconfirmed.
 
 ### Best Practices
 
@@ -363,46 +379,65 @@ For complete API documentation, see [Backend README](Backend/readme.md).
 
 ## 🌍 Deployment
 
-### Backend Deployment (Railway / Render / Heroku)
+The frontend and backend deploy separately, but the browser only ever talks to
+**one origin**: Vercel rewrites `/api/*` through to the backend. That keeps the
+auth cookie first-party, so it can stay `sameSite=strict` and CORS never enters
+the picture.
 
-1. **Set environment variables** in your hosting platform:
-   ```
-   PORT=3000
-   MONGODB_URI=<your-mongodb-atlas-uri>
-   NODE_ENV=production
-   JWT_SECRET=<strong-secret-key>
-   JWT_EXPIRY=7d
-   FRONTEND_URL=https://your-frontend-domain.com
-   ```
+### 1. MongoDB Atlas
 
-2. **Deploy commands:**
-   ```bash
-   npm install
-   npm start
-   ```
+1. Create a cluster and a database user.
+2. Network Access → allow `0.0.0.0/0`. Free hosting tiers have no static
+   outbound IP, so there is no narrower option; the database password is the
+   real access control.
+3. Copy the connection string. It must **not** end with the database name —
+   `src/db/index.js` appends `/Nukta` itself.
 
-3. **Configure static file serving** for uploaded images
+### 2. Cloudinary
 
-### Frontend Deployment (Vercel / Netlify)
+Create a free account and copy `CLOUDINARY_URL` from the dashboard
+(Product Environment Credentials). Images are uploaded straight there, so no
+persistent disk is needed on the API host.
 
-1. **Build the frontend:**
-   ```bash
-   npm run build
-   ```
+### 3. Backend (Render)
 
-2. **Set environment variables:**
-   ```
-   VITE_API_URL=https://your-backend-domain.com
-   ```
+`Backend/render.yaml` is a Render blueprint: **New → Blueprint →** pick this
+repo and it fills in the service for you.
 
-3. **Deploy** the `dist` folder
+Secrets to supply in the dashboard:
 
-### MongoDB Setup
+| Variable | Notes |
+| --- | --- |
+| `MONGODB_URI` | Atlas connection string |
+| `FRONTEND_URL` | The Vercel URL (CORS fallback only) |
+| `HUGGINGFACE_API_KEY` | Needs the *Make calls to Inference Providers* permission |
+| `CLOUDINARY_URL` | `cloudinary://<key>:<secret>@<cloud_name>` |
 
-1. Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-2. Whitelist your application IP addresses
-3. Create a database user
-4. Get the connection string and add to `.env`
+`JWT_SECRET` is generated by Render; `NODE_ENV=production` is set by the
+blueprint, which switches on `secure` cookies and `trust proxy`.
+
+Verify with `curl https://<service>.onrender.com/health`. On the free tier the
+first request after an idle period takes ~50s to wake the instance.
+
+### 4. Point the proxy at the backend
+
+In `Frontend/vercel.json`, replace `REPLACE-WITH-BACKEND-HOST` with the Render
+hostname. The `/api` rule **must** stay above the SPA catch-all, or every API
+call returns `index.html`.
+
+### 5. Frontend (Vercel)
+
+Import the repo with `Frontend` as the root directory, then set:
+
+| Variable | Value |
+| --- | --- |
+| `VITE_BACKEND_API_URL` | **empty** (or leave it unset) |
+| `VITE_TINYMCE_API_KEY` | Your TinyMCE cloud key |
+
+A non-empty `VITE_BACKEND_API_URL` sends requests cross-origin and the auth
+cookie is dropped — you will appear to log in and then be logged out on the
+next request. Vite inlines env vars at build time, so redeploy after changing
+them.
 
 ---
 
@@ -459,15 +494,18 @@ token.
 
 ## 🧪 Testing
 
-### Run Tests
-```bash
-# Backend tests
-cd Backend
-npm test
+### Automated tests
 
-# Frontend tests
+There are none yet. `npm test` in `Backend/` is still the npm placeholder that
+exits with an error, and the frontend has no test runner configured. Adding a
+suite is the most useful next contribution.
+
+What *is* wired up:
+
+```bash
 cd Frontend
-npm test
+npm run lint     # ESLint, currently clean
+npm run build    # production build
 ```
 
 ### API Testing

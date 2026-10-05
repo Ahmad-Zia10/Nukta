@@ -28,6 +28,16 @@ const postSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Cached AI summary. The summarizer calls a metered third-party API, so the
+    // result is stored and reused until the content changes.
+    summary: {
+      type: String,
+      default: '',
+    },
+    summaryGeneratedAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
@@ -44,10 +54,10 @@ const postSchema = new mongoose.Schema(
   }
 );
 
-// Index for faster queries
-postSchema.index({ slug: 1 });
-postSchema.index({ userId: 1 });
-postSchema.index({ status: 1 });
+// `slug` already has an index from `unique: true`; declaring it again makes
+// Mongoose warn about a duplicate.
+postSchema.index({ userId: 1, createdAt: -1 });
+postSchema.index({ status: 1, createdAt: -1 });
 
 const Post = mongoose.model('Post', postSchema);
 

@@ -137,6 +137,8 @@ export const apiSlice = createApi({
       query: (params = {}) => {
         const queryParams = new URLSearchParams();
         if (params.userId) queryParams.append('userId', params.userId);
+        if (params.page) queryParams.append('page', params.page);
+        if (params.limit) queryParams.append('limit', params.limit);
 
         const qs = queryParams.toString();
         return qs ? `/api/posts?${qs}` : '/api/posts';
@@ -152,7 +154,14 @@ export const apiSlice = createApi({
     }),
 
     getMyPosts: builder.query({
-      query: () => '/api/posts/user/my-posts',
+      query: (params = {}) => {
+        const queryParams = new URLSearchParams();
+        if (params.page) queryParams.append('page', params.page);
+        if (params.limit) queryParams.append('limit', params.limit);
+
+        const qs = queryParams.toString();
+        return qs ? `/api/posts/user/my-posts?${qs}` : '/api/posts/user/my-posts';
+      },
       transformResponse: (response) => response.data,
       providesTags: (result) =>
         result

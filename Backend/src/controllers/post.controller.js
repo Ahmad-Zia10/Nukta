@@ -2,6 +2,9 @@ import Post from '../models/post.model.js';
 import { summarizeText } from '../utils/summarizer.js';
 import { sanitizePostContent, stripTags } from '../utils/sanitize.js';
 import { uploadImageBuffer, deleteImage, publicIdFromUrl } from '../utils/cloudinary.js';
+import { generateUniqueSlug } from '../utils/slug.js';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../constants.js';
+import { assertRealImage } from '../middlewares/upload.middleware.js';
 
 /**
  * Distinguishes "the image could not be stored" from any other failure, so the
@@ -9,6 +12,31 @@ import { uploadImageBuffer, deleteImage, publicIdFromUrl } from '../utils/cloudi
  */
 const isImageStorageError = (error) =>
   /not configured|CLOUDINARY|Image upload failed/i.test(error?.message || '');
+
+
+/**
+ * Read page/limit from a query string, clamped to sane bounds so a client
+ * cannot ask for the entire collection in one request.
+ *
+ * @param {object} query - req.query
+ * @returns {{page: number, limit: number, skip: number}}
+ */
+const readPagination = (query) => {
+  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const requested = parseInt(query.limit, 10) || DEFAULT_PAGE_SIZE;
+  const limit = Math.min(Math.max(1, requested), MAX_PAGE_SIZE);
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+/** Shape a paginated list response consistently across endpoints. */
+const paginatedResponse = (posts, total, page, limit) => ({
+  posts,
+  total,
+  page,
+  limit,
+  totalPages: Math.max(1, Math.ceil(total / limit)),
+  hasMore: page * limit < total,
+});
 
 /**
  * Create a new post
@@ -19,27 +47,29 @@ export const createPost = async (req, res) => {
     const userId = req.user._id;
 
     // Validate required fields
-    if (!title || !slug || !content) {
+    if (!title || !content) {
       return res.status(400).json({
         success: false,
-        message: 'Title, slug, and content are required',
+        message: 'Title and content are required',
       });
     }
 
-    // Check if slug already exists
-    const existingPost = await Post.findOne({ slug });
-    if (existingPost) {
-      return res.status(409).json({
-        success: false,
-        message: 'Post with this slug already exists',
-      });
-    }
+    // Slugs are global, so two authors writing "Hello World" would collide.
+    // Normalise the requested slug and append -2, -3, ... when it is taken,
+    // rather than rejecting the post with a 409 the author cannot act on.
+    const uniqueSlug = await generateUniqueSlug(slug || title, title);
 
     // Upload the featured image before creating the post, so a failed upload
     // never leaves a post pointing at an image that does not exist.
     let featuredImage = '';
     let featuredImagePublicId = '';
     if (req.file) {
+      // The declared Content-Type proves nothing; check the actual bytes.
+      const check = assertRealImage(req.file.buffer);
+      if (!check.ok) {
+        return res.status(400).json({ success: false, message: check.reason });
+      }
+
       const uploaded = await uploadImageBuffer(req.file.buffer);
       featuredImage = uploaded.url;
       featuredImagePublicId = uploaded.publicId;
@@ -60,7 +90,7 @@ export const createPost = async (req, res) => {
     // Create post
     const post = await Post.create({
       title: cleanTitle,
-      slug,
+      slug: uniqueSlug,
       content: cleanContent,
       featuredImage,
       featuredImagePublicId,
@@ -122,6 +152,11 @@ export const updatePost = async (req, res) => {
     // failed save can never leave the post pointing at a deleted image.
     let replacedImagePublicId = null;
     if (req.file) {
+      const check = assertRealImage(req.file.buffer);
+      if (!check.ok) {
+        return res.status(400).json({ success: false, message: check.reason });
+      }
+
       const uploaded = await uploadImageBuffer(req.file.buffer);
       replacedImagePublicId =
         post.featuredImagePublicId || publicIdFromUrl(post.featuredImage);
@@ -147,6 +182,12 @@ export const updatePost = async (req, res) => {
           success: false,
           message: 'Content must contain readable text',
         });
+      }
+      // A cached summary describes the old text, so drop it when the body
+      // changes and let the next request regenerate it.
+      if (cleanContent !== post.content) {
+        post.summary = '';
+        post.summaryGeneratedAt = null;
       }
       post.content = cleanContent;
     }
@@ -286,16 +327,22 @@ export const listPosts = async (req, res) => {
       query.userId = userId;
     }
 
-    const posts = await Post.find(query)
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = readPagination(req.query);
+
+    // Counting alongside the page keeps `total` honest without loading every
+    // document just to measure the collection.
+    const [posts, total] = await Promise.all([
+      Post.find(query)
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments(query),
+    ]);
 
     return res.status(200).json({
       success: true,
-      data: {
-        total: posts.length,
-        posts,
-      },
+      data: paginatedResponse(posts, total, page, limit),
     });
   } catch (error) {
     console.error('List posts error:', error);
@@ -314,16 +361,20 @@ export const getMyPosts = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const posts = await Post.find({ userId })
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 });
+    const { page, limit, skip } = readPagination(req.query);
+
+    const [posts, total] = await Promise.all([
+      Post.find({ userId })
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Post.countDocuments({ userId }),
+    ]);
 
     return res.status(200).json({
       success: true,
-      data: {
-        total: posts.length,
-        posts,
-      },
+      data: paginatedResponse(posts, total, page, limit),
     });
   } catch (error) {
     console.error('Get my posts error:', error);
@@ -359,14 +410,39 @@ export const summarizePost = async (req, res) => {
       });
     }
 
-    // Generate summary
+    // Reuse a cached summary: this endpoint proxies a metered third-party API,
+    // and the summary only changes when the content does.
+    if (post.summary) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          summary: post.summary,
+          postTitle: post.title,
+          cached: true,
+          generatedAt: post.summaryGeneratedAt,
+        },
+      });
+    }
+
     const summary = await summarizeText(post.content);
+
+    // Persist for next time. A failed write must not fail the response --
+    // the caller already has a valid summary.
+    try {
+      post.summary = summary;
+      post.summaryGeneratedAt = new Date();
+      await post.save();
+    } catch (cacheError) {
+      console.error('Failed to cache summary:', cacheError.message);
+    }
 
     return res.status(200).json({
       success: true,
       data: {
         summary,
         postTitle: post.title,
+        cached: false,
+        generatedAt: post.summaryGeneratedAt,
       },
     });
   } catch (error) {

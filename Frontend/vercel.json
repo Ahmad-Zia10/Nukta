@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
+      "destination": "https://nukta-f3bb.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

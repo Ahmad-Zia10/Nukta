@@ -12,6 +12,7 @@ import Select from './Select'
 import RTE from './RTE'
 import PostForm from './PostForm/PostForm'
 import PostCard from './PostCard'
+import Pagination from './Pagination'
 import AuthLayout from './AuthLayout'
 
 
@@ -30,5 +31,6 @@ export {
     RTE,
     PostForm,
     PostCard,
+    Pagination,
     AuthLayout
 }
